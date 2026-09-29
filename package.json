@@ -1,0 +1,12 @@
+{
+  "name": "lavid",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Generación de imágenes con la API de Higgsfield",
+  "engines": { "node": ">=20.6" },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.js",
+    "generate": "node --env-file-if-exists=.env scripts/generate.js"
+  }
+}

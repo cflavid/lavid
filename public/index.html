@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Generador de imágenes</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
+    textarea, select, input, button { font: inherit; width: 100%; box-sizing: border-box; margin-bottom: .75rem; padding: .5rem; }
+    button { cursor: pointer; }
+    #status { color: #555; }
+    #images img { max-width: 100%; border-radius: 8px; margin-top: 1rem; }
+  </style>
+</head>
+<body>
+  <h1>Generador de imágenes (Higgsfield)</h1>
+  <form id="form">
+    <label>Prompt<textarea name="prompt" rows="4" required placeholder="Describe la imagen..."></textarea></label>
+    <label>Formato
+      <select name="aspect_ratio">
+        <option value="1:1">1:1 (cuadrado)</option>
+        <option value="9:16">9:16 (vertical)</option>
+        <option value="16:9">16:9 (horizontal)</option>
+        <option value="4:5">4:5 (Instagram)</option>
+      </select>
+    </label>
+    <label>Semilla (opcional)<input name="seed" type="number"></label>
+    <button type="submit">Generar</button>
+  </form>
+  <p id="status"></p>
+  <div id="images"></div>
+
+  <script>
+    const form = document.getElementById('form');
+    const statusEl = document.getElementById('status');
+    const imagesEl = document.getElementById('images');
+    const labels = { queued: 'En cola...', in_progress: 'Generando...', completed: 'Listo', failed: 'Falló la generación', nsfw: 'Rechazada por moderación' };
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const button = form.querySelector('button');
+      button.disabled = true;
+      imagesEl.innerHTML = '';
+      statusEl.textContent = 'Enviando...';
+      try {
+        const res = await fetch('/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(Object.fromEntries(new FormData(form))),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        await poll(data.request_id);
+      } catch (err) {
+        statusEl.textContent = 'Error: ' + err.message;
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    async function poll(id) {
+      while (true) {
+        const res = await fetch('/api/status/' + id);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        statusEl.textContent = labels[data.status] || data.status;
+        if (data.status === 'completed') {
+          for (const url of data.images) {
+            const a = document.createElement('a');
+            a.href = url; a.target = '_blank';
+            a.innerHTML = `<img src="${url}" alt="Imagen generada">`;
+            imagesEl.appendChild(a);
+          }
+          return;
+        }
+        if (data.status === 'failed' || data.status === 'nsfw') return;
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+    }
+  </script>
+</body>
+</html>
